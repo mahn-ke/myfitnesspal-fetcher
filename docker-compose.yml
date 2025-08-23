@@ -4,3 +4,8 @@ services:
   app:
     image: ghcr.io/mahn-ke/myfitnesspal-fetcher:latest
     restart: unless-stopped
+    environment:
+      - RUN_AT_STARTUP=true
+      - GCP_CREDENTIALS=${GCP_CREDENTIALS}
+      - MFP_COOKIE=${MFP_COOKIE}
+      - GOOGLE_SHEET_ID=${GOOGLE_SHEET_ID}
