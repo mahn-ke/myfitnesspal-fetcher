@@ -1,0 +1,6 @@
+{
+    "name": "myfitnesspal-fetcher",
+    "scripts": {
+        "start": "node main.js"
+    }
+}
