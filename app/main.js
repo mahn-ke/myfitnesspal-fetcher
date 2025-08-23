@@ -6,7 +6,18 @@ async function getSessionCookie() {
 	return process.env.MFP_COOKIE;
 }
 
-function formatDate(dateWithoutLeadingZeroes) {
+function formatMFPDate(dateWithoutLeadingZeroes) {
+    dateWithoutLeadingZeroes = typeof dateWithoutLeadingZeroes === 'object' ? dateWithoutLeadingZeroes.date : dateWithoutLeadingZeroes;
+    const [year, month, day] = dateWithoutLeadingZeroes.replace(/-/g, '/').split('/');
+    const mm = month.padStart(2, '0');
+    const dd = day.padStart(2, '0');
+    return `${mm}/${dd}/${year}`;
+}
+
+function formatGoogleDate(dateWithoutLeadingZeroes) {
+	if (/[a-zA-Z]/.test(dateWithoutLeadingZeroes)) {
+		return dateWithoutLeadingZeroes;
+	}
     dateWithoutLeadingZeroes = typeof dateWithoutLeadingZeroes === 'object' ? dateWithoutLeadingZeroes.date : dateWithoutLeadingZeroes;
     const [month, day, year] = dateWithoutLeadingZeroes.replace(/-/g, '/').split('/');
     const mm = month.padStart(2, '0');
@@ -49,7 +60,7 @@ async function fetchCheckinHistory(sessionCookie) {
 
 		const data = await response.json();
 		// Ensure all dates are in MM/DD/YYYY format with leading zeroes
-		return data.map(formatDate);
+		return data;
 	} catch (error) {
 		console.error('Error fetching diary report:', error);
 		throw error;
@@ -59,7 +70,6 @@ async function fetchCheckinHistory(sessionCookie) {
 // Google Sheets API setup
 const SHEET_ID = process.env.GOOGLE_SHEET_ID;
 const TAB_NAME = 'Calories';
-// Use credentials from GCP_CREDENTIALS_JSON environment variable
 async function awaitSetInSheet(summaries) {
 	if (!process.env.GCP_CREDENTIALS) {
 		throw new Error('GCP_CREDENTIALS environment variable not set.');
@@ -78,11 +88,11 @@ async function awaitSetInSheet(summaries) {
         spreadsheetId: SHEET_ID,
         range,
     });
-	const existingDates = new Set((res.data.values || []).flat().map(v => v.trim()));
+	const existingDates = Array.from(new Set((res.data.values || []).flat().map(v => v.trim())))
 
     // Prepare new dates to append
     const newDates = summaries
-        .filter(data => !existingDates.has(data.date))
+        .filter(data => !existingDates.map(formatGoogleDate).includes(data.date))
         .map(data => [data.date, data.kcal, data.carbs, data.fats, data.protein]);
 
     if (newDates.length === 0) {
@@ -122,7 +132,7 @@ async function runJob() {
 				{ kcal: 0, carbs: 0, fats: 0, protein: 0 }
 			);
 			return {
-				date: formatDate(entry.date),
+				date: formatMFPDate(entry.date),
 				kcal: summary.kcal,
 				carbs: summary.carbs,
 				fats: summary.fats,
