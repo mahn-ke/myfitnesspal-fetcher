@@ -83,18 +83,17 @@ async function awaitSetInSheet(summaries) {
     const sheets = google.sheets({ version: 'v4', auth: await auth.getClient() });
 
     // Get all dates in column A
-    const range = `${TAB_NAME}!A:A`;
+    const range = `${TAB_NAME}!A:B`;
     const res = await sheets.spreadsheets.values.get({
         spreadsheetId: SHEET_ID,
         range,
     });
-	const existingDates = Array.from(new Set((res.data.values || []).flat().map(v => v.trim())))
-
     // Prepare new dates to append
 	// Map existing dates to their row numbers and kcal values
 	const existingRows = {};
 	(res.data.values || []).forEach((row, idx) => {
 		const date = formatGoogleDate(row[0]?.trim());
+		console.log(`Row ID ${idx + 1} for date ${date}: Raw data ${row[1]}, Converted ${Number(row[1] || 0)}`);
 		const kcal = Number(row[1]) || 0;
 		if (date) existingRows[date] = { row: idx + 1, kcal };
 	});
@@ -106,8 +105,7 @@ async function awaitSetInSheet(summaries) {
 		const date = data.date;
 		if (!existingRows[date]) {
 			newDates.push([date, data.kcal, data.carbs, data.fats, data.protein]);
-		} else if (data.kcal > existingRows[date].kcal) {
-			// Prepare update for this row (row numbers are 1-based)
+		} else if (Math.round(data.kcal) > Math.round(existingRows[date].kcal)) {
 			updates.push({
 				range: `${TAB_NAME}!B${existingRows[date].row}:E${existingRows[date].row}`,
 				values: [[data.kcal, data.carbs, data.fats, data.protein]]
@@ -130,6 +128,7 @@ async function awaitSetInSheet(summaries) {
 	}
 
 	// Batch update existing rows if kcal is larger
+	console.log(`Updating ${updates.length} existing date(s) with higher kcal`);
 	if (updates.length > 0) {
 		await sheets.spreadsheets.values.batchUpdate({
 			spreadsheetId: SHEET_ID,
@@ -138,7 +137,6 @@ async function awaitSetInSheet(summaries) {
 				valueInputOption: 'USER_ENTERED'
 			}
 		});
-		console.log(`Updated ${updates.length} existing date(s) with higher kcal.`);
 	}
 }
 
