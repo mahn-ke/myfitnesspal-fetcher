@@ -91,25 +91,55 @@ async function awaitSetInSheet(summaries) {
 	const existingDates = Array.from(new Set((res.data.values || []).flat().map(v => v.trim())))
 
     // Prepare new dates to append
-    const newDates = summaries
-        .filter(data => !existingDates.map(formatGoogleDate).includes(data.date))
-        .map(data => [data.date, data.kcal, data.carbs, data.fats, data.protein]);
+	// Map existing dates to their row numbers and kcal values
+	const existingRows = {};
+	(res.data.values || []).forEach((row, idx) => {
+		const date = formatGoogleDate(row[0]?.trim());
+		const kcal = Number(row[1]) || 0;
+		if (date) existingRows[date] = { row: idx + 1, kcal };
+	});
 
-    if (newDates.length === 0) {
-        console.log('No new dates to add.');
-        return;
-    }
+	const newDates = [];
+	const updates = [];
 
-    // Append new dates
-    await sheets.spreadsheets.values.append({
-        spreadsheetId: SHEET_ID,
-        range,
-        valueInputOption: 'USER_ENTERED',
-        insertDataOption: 'INSERT_ROWS',
-        resource: { values: newDates },
-    });
+	summaries.forEach(data => {
+		const date = data.date;
+		if (!existingRows[date]) {
+			newDates.push([date, data.kcal, data.carbs, data.fats, data.protein]);
+		} else if (data.kcal > existingRows[date].kcal) {
+			// Prepare update for this row (row numbers are 1-based)
+			updates.push({
+				range: `${TAB_NAME}!B${existingRows[date].row}:E${existingRows[date].row}`,
+				values: [[data.kcal, data.carbs, data.fats, data.protein]]
+			});
+		}
+	});
 
-    console.log(`Added ${newDates.length} new date(s) to the sheet.`);
+	// Append new dates
+	if (newDates.length > 0) {
+		await sheets.spreadsheets.values.append({
+			spreadsheetId: SHEET_ID,
+			range,
+			valueInputOption: 'USER_ENTERED',
+			insertDataOption: 'INSERT_ROWS',
+			resource: { values: newDates },
+		});
+		console.log(`Added ${newDates.length} new date(s) to the sheet.`);
+	} else {
+		console.log('No new dates to add.');
+	}
+
+	// Batch update existing rows if kcal is larger
+	if (updates.length > 0) {
+		await sheets.spreadsheets.values.batchUpdate({
+			spreadsheetId: SHEET_ID,
+			resource: {
+				data: updates,
+				valueInputOption: 'USER_ENTERED'
+			}
+		});
+		console.log(`Updated ${updates.length} existing date(s) with higher kcal.`);
+	}
 }
 
 const task = cron.schedule('0 0 * * *', runJob);
