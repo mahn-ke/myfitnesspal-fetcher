@@ -18,6 +18,10 @@ terraform {
       source  = "integrations/github"
       version = "~> 6.6.0"
     }
+    gotify = {
+      source  = "LukasKnuth/gotify"
+      version = "~> 0.3.0"
+    }
   }
 }
 
