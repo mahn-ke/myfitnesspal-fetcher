@@ -8,11 +8,11 @@ terraform {
   required_providers {
     allinkl = {
       source  = "ViMaSter/allinkl"
-      version = "0.1.2"
+      version = "0.1.5"
     }
     keycloak = {
       source  = "keycloak/keycloak"
-      version = "5.0.0"
+      version = "5.4.0"
     }
     github = {
       source  = "integrations/github"
