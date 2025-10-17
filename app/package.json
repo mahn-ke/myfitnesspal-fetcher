@@ -6,7 +6,7 @@
     },
     "dependencies": {
         "@google-cloud/local-auth": "^3.0.0",
-        "googleapis": "^163.0.0",
+        "googleapis": "^164.0.0",
         "node-cron": "^4.2.1"
     }
 }
