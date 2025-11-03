@@ -26,7 +26,7 @@ function formatGoogleDate(dateWithoutLeadingZeroes) {
 }
 
 // Fetch check-in history  
-async function fetchCheckinHistory(sessionCookie) {  
+async function fetchCheckinHistory(sessionCookieValue) {  
 	const reportUrl = 'https://www.myfitnesspal.com/api/services/diary/report';
 	const today = new Date();
 	const lastYear = new Date(today);
@@ -41,7 +41,7 @@ async function fetchCheckinHistory(sessionCookie) {
 			headers: {
 				'Accept': 'application/json, text/plain, */*',
 				'Content-Type': 'application/json',
-				'Cookie': sessionCookie
+				'Cookie': "__Secure-next-auth.session-token="+sessionCookieValue
 			},
 			body: JSON.stringify({
 				username: "Cynamiter",
@@ -144,8 +144,8 @@ const task = cron.schedule('0 0 * * *', runJob);
 
 async function runJob() {
 	try {  
-		const sessionCookie = await getSessionCookie();  
-		const checkinHistory = await fetchCheckinHistory(sessionCookie);
+		const sessionCookieValue = await getSessionCookie();  
+		const checkinHistory = await fetchCheckinHistory(sessionCookieValue);
 		const summaries = checkinHistory.map(entry => {
 			const foodEntries = entry.food_entries || [];
 			const summary = foodEntries.reduce(
