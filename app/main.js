@@ -25,44 +25,107 @@ function formatGoogleDate(dateWithoutLeadingZeroes) {
     return `${mm}/${dd}/${year}`;
 }
 
-// Fetch check-in history  
-async function fetchCheckinHistory(sessionCookieValue) {  
-	const reportUrl = 'https://www.myfitnesspal.com/api/services/diary/report';
-	const today = new Date();
-	const lastYear = new Date(today);
-	lastYear.setFullYear(today.getFullYear() - 1);
+// Fetch check-in history using nutrition report endpoints (last 90 days)
+async function fetchCheckinHistory(sessionCookieValue) {
+	const endpoints = {
+		carbs: 'https://www.myfitnesspal.com/api/services/reports/results/nutrition/carbs/90?report_name=carbs',
+		fat: 'https://www.myfitnesspal.com/api/services/reports/results/nutrition/fat/90?report_name=fat',
+		protein: 'https://www.myfitnesspal.com/api/services/reports/results/nutrition/protein/90?report_name=protein',
+		calories: 'https://www.myfitnesspal.com/api/services/reports/results/nutrition/Calories/90?report_name=Calories'
+	};
 
-	const from = lastYear.toISOString().split('T')[0];
-	const to = today.toISOString().split('T')[0];
+	const headers = {
+		'Accept': 'application/json, text/plain, */*',
+		'Cookie': "__Secure-next-auth.session-token=" + sessionCookieValue
+	};
+
+	const fetchOutcome = async (url, label) => {
+		const res = await fetch(url, { method: 'GET', headers });
+		if (!res.ok) {
+			throw new Error(`Failed to fetch ${label} report with status ${res.status}: ${await res.text()}`);
+		}
+		const json = await res.json();
+		return json?.outcome?.results || [];
+	};
 
 	try {
-		const response = await fetch(reportUrl, {
-			method: 'POST',
-			headers: {
-				'Accept': 'application/json, text/plain, */*',
-				'Content-Type': 'application/json',
-				'Cookie': "__Secure-next-auth.session-token="+sessionCookieValue
-			},
-			body: JSON.stringify({
-				username: "Cynamiter",
-				show_food_diary: 1,
-				show_exercise_diary: 1,
-				show_food_notes: 0,
-				show_exercise_notes: 0,
-				from,
-				to
-			})
+		const [carbsResults, fatResults, proteinResults, calorieResults] = await Promise.all([
+			fetchOutcome(endpoints.carbs, 'carbs'),
+			fetchOutcome(endpoints.fat, 'fat'),
+			fetchOutcome(endpoints.protein, 'protein'),
+			fetchOutcome(endpoints.calories, 'calories')
+		]);
+
+		const today = new Date();
+		const currentYear = today.getFullYear();
+
+		const resolveDateWithYear = (mmdd) => {
+			const [mmStr, ddStr] = String(mmdd).split('/');
+			const mm = parseInt(mmStr, 10);
+			const dd = parseInt(ddStr, 10);
+			// If the month/day appears later than today in the calendar, assume previous year.
+			const isFutureInCalendar = (mm > (today.getMonth() + 1)) || (mm === (today.getMonth() + 1) && dd > today.getDate());
+			const yr = isFutureInCalendar ? currentYear - 1 : currentYear;
+			const mmPad = String(mm).padStart(2, '0');
+			const ddPad = String(dd).padStart(2, '0');
+			// Use YYYY/MM/DD since formatMFPDate expects year-first separators.
+			return `${yr}/${mmPad}/${ddPad}`;
+		};
+
+		const byDate = new Map();
+		const ensureEntry = (dateKey) => {
+			if (!byDate.has(dateKey)) {
+				byDate.set(dateKey, {
+					date: dateKey,
+					food_entries: [{
+						nutritional_contents: {
+							energy: { value: 0 },
+							carbohydrates: 0,
+							fat: 0,
+							protein: 0
+						}
+					}]
+				});
+			}
+			return byDate.get(dateKey);
+		};
+
+		const addSeries = (results, key) => {
+			for (const item of results) {
+				const dateKey = resolveDateWithYear(item.date);
+				const entry = ensureEntry(dateKey);
+				const nc = entry.food_entries[0].nutritional_contents;
+				const total = Number(item.total) || 0;
+				switch (key) {
+					case 'carbs':
+						nc.carbohydrates = total;
+						break;
+					case 'fat':
+						nc.fat = total;
+						break;
+					case 'protein':
+						nc.protein = total;
+						break;
+					case 'calories':
+						nc.energy = { value: total };
+						break;
+				}
+			}
+		};
+
+		addSeries(carbsResults, 'carbs');
+		addSeries(fatResults, 'fat');
+		addSeries(proteinResults, 'protein');
+		addSeries(calorieResults, 'calories');
+
+		// Return entries sorted by date ascending for consistency
+		const entries = Array.from(byDate.values()).sort((a, b) => {
+			// Compare by YYYY/MM/DD lexicographically works the same as date order
+			return a.date.localeCompare(b.date);
 		});
-
-		if (!response.ok) {
-			throw new Error(`Failed to fetch diary report with status ${response.status}: ${await response.text()}`);
-		}
-
-		const data = await response.json();
-		// Ensure all dates are in MM/DD/YYYY format with leading zeroes
-		return data;
+		return entries;
 	} catch (error) {
-		console.error('Error fetching diary report:', error);
+		console.error('Error fetching nutrition reports:', error);
 		throw error;
 	}
 }
