@@ -22,6 +22,10 @@ terraform {
       source  = "LukasKnuth/gotify"
       version = "~> 0.3.0"
     }
+    uptimekuma = {
+      source  = "breml/uptimekuma"
+      version = "~> 0.1"
+    }
   }
 }
 
@@ -42,6 +46,9 @@ variable "GITHUB_PAT" {
 provider "github" {
   owner = "mahn-ke"
   token = var.GITHUB_PAT
+}
+
+provider "uptimekuma" {
 }
 
 data "keycloak_realm" "sso_by_vincent_mahn_ke" {
