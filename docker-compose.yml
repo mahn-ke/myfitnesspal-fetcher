@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   app:
-    image: ghcr.io/mahn-ke/myfitnesspal-fetcher:latest@sha256:de0a6be363a70ff14ee725fab7fe55d48b2eb2201a0a08ed107e958bc0c9ff40
+    image: ghcr.io/mahn-ke/myfitnesspal-fetcher:latest@sha256:310dd59ca6b459089952552065f58188c60909eab4b53f638114f4ae5480ad0a
     restart: unless-stopped
     environment:
       - RUN_AT_STARTUP=true
